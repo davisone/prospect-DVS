@@ -46,6 +46,12 @@ export default function RootLayout({
                       Recherche Google
                     </Link>
                     <Link
+                      href="/suivi"
+                      className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Suivi
+                    </Link>
+                    <Link
                       href="/settings"
                       className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                     >

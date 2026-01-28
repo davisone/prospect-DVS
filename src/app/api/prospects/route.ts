@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { prospects, analyses, emailDrafts } from '@/lib/db/schema';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, ne, or, and } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
 import type { ProspectStatus, ProspectSource } from '@/types';
 
@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status') as ProspectStatus | null;
+    const includeExcluded = searchParams.get('includeExcluded') === 'true';
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
@@ -24,6 +25,17 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(prospects.createdAt))
       .limit(limit)
       .offset(offset);
+
+    // Par défaut, exclure les prospects "not_prospectable" sauf si demandé
+    if (!includeExcluded) {
+      query = query.where(
+        or(
+          eq(prospects.followUpStatus, 'none'),
+          ne(prospects.followUpStatus, 'not_prospectable'),
+          // null est aussi OK (pas encore de statut)
+        )
+      ) as typeof query;
+    }
 
     if (status) {
       query = query.where(eq(prospects.status, status)) as typeof query;
@@ -75,10 +87,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Récupérer tous les prospects existants pour vérifier les doublons
+    const existingProspects = await db.select().from(prospects);
+
     const inserted = [];
+    const skipped = [];
 
     for (const prospect of prospectList) {
       if (!prospect.name) continue;
+
+      // Normaliser l'URL pour la comparaison
+      const normalizeUrl = (url: string | undefined | null) => {
+        if (!url) return null;
+        return url.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+      };
+
+      const prospectUrl = normalizeUrl(prospect.url);
+
+      // Vérifier si le prospect existe déjà (par URL ou par nom+ville)
+      const existingByUrl = prospectUrl
+        ? existingProspects.find(
+            (p) => normalizeUrl(p.url) === prospectUrl
+          )
+        : null;
+
+      const existingByName = existingProspects.find(
+        (p) =>
+          p.name.toLowerCase() === prospect.name.toLowerCase() &&
+          p.city?.toLowerCase() === prospect.city?.toLowerCase()
+      );
+
+      const existing = existingByUrl || existingByName;
+
+      if (existing) {
+        // Si le prospect existe et est "not_prospectable", on le skip
+        if (existing.followUpStatus === 'not_prospectable') {
+          skipped.push({ name: prospect.name, reason: 'exclu' });
+          continue;
+        }
+        // Sinon c'est un doublon
+        skipped.push({ name: prospect.name, reason: 'doublon' });
+        continue;
+      }
 
       const id = uuid();
       await db.insert(prospects).values({
@@ -90,6 +140,7 @@ export async function POST(request: NextRequest) {
         phone: prospect.phone || null,
         source,
         status: 'pending',
+        followUpStatus: 'none',
         createdAt: new Date(),
       });
 
@@ -99,6 +150,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       inserted: inserted.length,
+      skipped: skipped.length,
+      skippedDetails: skipped,
       prospects: inserted,
     });
   } catch (error) {

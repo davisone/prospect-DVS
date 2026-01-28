@@ -60,10 +60,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update prospect status
+    // Update prospect status and set follow-up to "waiting"
     await db
       .update(prospects)
-      .set({ status: 'sent' })
+      .set({
+        status: 'sent',
+        followUpStatus: 'waiting',
+        followUpAt: new Date(),
+      })
       .where(eq(prospects.id, prospectId));
 
     return NextResponse.json({

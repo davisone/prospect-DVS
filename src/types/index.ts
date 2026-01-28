@@ -1,6 +1,7 @@
 export type ProspectStatus = 'pending' | 'analyzed' | 'draft_ready' | 'queued' | 'sent';
 export type ProspectSource = 'csv' | 'google_places';
 export type QueueStatus = 'pending' | 'sent' | 'failed';
+export type FollowUpStatus = 'none' | 'waiting' | 'accepted' | 'refused' | 'no_response' | 'not_prospectable';
 
 export interface Prospect {
   id: string;
@@ -11,6 +12,9 @@ export interface Prospect {
   phone: string | null;
   source: ProspectSource;
   status: ProspectStatus;
+  followUpStatus: FollowUpStatus | null;
+  followUpNote: string | null;
+  followUpAt: number | Date | null;
   createdAt: number | Date;
 }
 

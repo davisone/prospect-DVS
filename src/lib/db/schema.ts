@@ -9,6 +9,9 @@ export const prospects = sqliteTable('prospects', {
   phone: text('phone'),
   source: text('source', { enum: ['csv', 'google_places'] }).notNull(),
   status: text('status', { enum: ['pending', 'analyzed', 'draft_ready', 'queued', 'sent'] }).notNull().default('pending'),
+  followUpStatus: text('follow_up_status', { enum: ['none', 'waiting', 'accepted', 'refused', 'no_response', 'not_prospectable'] }).default('none'),
+  followUpNote: text('follow_up_note'),
+  followUpAt: integer('follow_up_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 

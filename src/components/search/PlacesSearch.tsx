@@ -41,9 +41,10 @@ export function PlacesSearch() {
   const [type, setType] = useState<string>('all');
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<GooglePlaceResult[]>([]);
+  const [excludedCount, setExcludedCount] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -60,8 +61,13 @@ export function PlacesSearch() {
 
       if (response.ok) {
         setResults(data.places || []);
-        if (data.places?.length === 0) {
+        setExcludedCount(data.excludedCount || 0);
+        if (data.places?.length === 0 && data.excludedCount > 0) {
+          setMessage({ type: 'info', text: `${data.excludedCount} résultat(s) trouvé(s) mais déjà dans votre base` });
+        } else if (data.places?.length === 0) {
           setMessage({ type: 'error', text: 'Aucun résultat avec site web trouvé' });
+        } else if (data.excludedCount > 0) {
+          setMessage({ type: 'info', text: `${data.excludedCount} résultat(s) masqué(s) car déjà dans votre base` });
         }
       } else {
         setMessage({ type: 'error', text: data.error || 'Erreur de recherche' });
@@ -183,6 +189,8 @@ export function PlacesSearch() {
               className={`p-3 rounded-md ${
                 message.type === 'success'
                   ? 'bg-green-50 text-green-700'
+                  : message.type === 'info'
+                  ? 'bg-blue-50 text-blue-700'
                   : 'bg-red-50 text-red-700'
               }`}
             >

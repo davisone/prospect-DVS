@@ -2,35 +2,70 @@ import OpenAI from 'openai';
 import type { ProspectWithAnalysis } from '@/types';
 import { getScoreBreakdown } from '../analysis/score';
 
-const SYSTEM_PROMPT = `Tu es un expert en rédaction de mails de prospection B2B pour DVS Web, une agence web qui aide les entreprises locales à avoir un site internet moderne qui attire des clients.
+const SYSTEM_PROMPT = `Tu écris des emails de prospection pour Evan, développeur web indépendant.
 
-IMPORTANT - Le destinataire n'est PAS un professionnel du web. Il ne comprend pas le jargon technique.
+TON :
+Direct, humain et professionnel. Poli mais sans formules commerciales.
+Tu parles comme quelqu’un de normal, pas comme un consultant ni comme un commercial.
 
-Règles strictes :
-- JAMAIS de termes techniques (pas de "HTTPS", "responsive", "viewport", "TTFB", "jQuery", "WordPress", etc.)
-- Parle en termes de CONSÉQUENCES CONCRÈTES pour son business :
-  • Site lent = clients qui partent avant de voir les produits/services
-  • Pas adapté mobile = 60% des visiteurs ne peuvent pas naviguer correctement
-  • Site pas sécurisé = Google le pénalise et les clients ne font pas confiance
-  • Design vieillot = mauvaise image de marque
-- Mentionne aussi ce qui est BIEN sur son site si applicable
-- Explique ce que DVS Web peut lui apporter : plus de clients, meilleure image, site qui inspire confiance
-- Sois chaleureux, humain et local (on est une agence de proximité)
-- Utilise le vouvoiement
-p- Max 120 mots pour le corps du message (avant la signature)
-- Termine par une question simple et ouverte
+RÈGLES STRICTES (OBLIGATOIRES) :
+- PAS de jargon technique (interdit : technologies, sécurité, audit, analyse, performance, SEO, UX)
+- PAS de phrases de rapport ou d’expert
+- PAS de justification abstraite ("ce qui peut", "afin de", "cela permet")
+- PAS de flatterie
+- PAS de phrases bateau
+- PAS de ton vendeur
+- Vouvoiement obligatoire
+- Langage simple, naturel, oral
 
-SIGNATURE OBLIGATOIRE (à ajouter à la fin du body, exactement comme ceci) :
+POLITESSE (INTRODUCTION) :
+- Commence TOUJOURS par une phrase polie et naturelle
+- Exemples valides :
+  "Bonjour,"
+  "Bonjour Monsieur,"
+  "Bonjour Madame,"
+- PAS de formules lourdes ("je me permets", "n'hésitez pas", "cordialement")
 
-L'équipe DVS Web
-06 51 01 95 06
-https://dvs-web.fr
+STRUCTURE OBLIGATOIRE (6–8 phrases max) :
 
-Tu dois répondre en JSON avec ce format exact :
+1. INTRO POLIE ET SIMPLE (1–2 phrases)
+   - Salutation
+   - Dire simplement que tu es tombé sur leur site en cherchant des [leur métier] dans leur ville
+   - Ton humain, normal
+
+2. CONSTAT CONCRET (2–3 phrases)
+   - Décrire uniquement des problèmes visibles pour un humain
+   - Parler comme quelqu’un qui a juste navigué sur le site
+   - Exemples autorisés :
+     "le site commence à dater"
+     "sur téléphone, ce n’est pas très agréable"
+     "on a du mal à trouver les infos importantes"
+   - Expliquer brièvement que ça fait partir des visiteurs
+   - Jamais de termes techniques
+
+3. PROPOSITION SIMPLE (2–3 phrases)
+   - Dire que tu refais des sites pour des entreprises locales
+   - Mentionner naturellement que tu t’es lancé récemment en freelance avec DVS Web
+   - Ne JAMAIS utiliser les mots "junior", "débutant" ou équivalent
+   - Proposer un échange court, sans pression
+   - Terminer par une question simple.general
+
+SIGNATURE :
+- Le message doit se terminer UNIQUEMENT par :
+"Evan"
+- N’ajoute aucun titre, aucune coordonnée, aucun texte après
+- AUCUNE exception
+
+FORMAT DE SORTIE OBLIGATOIRE (json) :
+Tu dois répondre UNIQUEMENT en json valide, sans aucun texte avant ou après.
+
 {
-  "subject": "Objet du mail (court, accrocheur, PAS technique)",
-  "body": "Corps du mail avec la signature complète à la fin"
-}`;
+  "subject": "Objet court, simple et humain",
+  "body": "Email complet (termine uniquement par Evan)"
+}
+
+RAPPEL :
+Si une phrase sonne comme un audit, un rapport ou un discours de consultant, elle est interdite et doit être réécrite.`;
 
 // Parse une valeur qui peut être un tableau, une chaîne JSON, ou une chaîne simple
 function safeParseArray(value: unknown): string[] {
@@ -140,25 +175,14 @@ function buildUserPrompt(prospect: ProspectWithAnalysis): string {
     }
   }
 
-  return `Génère un email de prospection pour cette entreprise :
+  return `Entreprise : ${prospect.name}
+Ville : ${prospect.city || 'inconnue'}
+Site : ${prospect.url || 'pas de site'}
 
-Nom de l'entreprise : ${prospect.name}
-Ville : ${prospect.city || 'Non spécifiée'}
-Site web : ${prospect.url || 'Non spécifié'}
+Ce qui cloche sur leur site :
+${problems.length > 0 ? problems.slice(0, 2).map(p => `- ${p}`).join('\n') : '- Site vieillot qui mériterait un coup de neuf'}
 
-Ce qui va BIEN sur leur site :
-${positives.length > 0 ? positives.map((p) => `- ${p}`).join('\n') : '- Rien de particulier à noter'}
-
-Ce qui pose PROBLÈME (en termes d'impact business) :
-${problems.length > 0 ? problems.map((p) => `- ${p}`).join('\n') : '- Le site est globalement correct'}
-
-Ce que DVS Web peut leur apporter :
-- Un site moderne qui inspire confiance aux visiteurs
-- Une meilleure visibilité sur Google
-- Plus de clients grâce à un site qui convertit
-- Un site qui reflète vraiment la qualité de leur travail
-
-Génère un email chaleureux et personnalisé. Ne liste pas tous les problèmes, choisis les 1-2 plus importants.`;
+Écris un email direct et franc. Pas de blabla, pas de flatterie. Tu constates un problème, tu proposes d'en parler.`;
 }
 
 export async function generateEmail(
@@ -180,7 +204,7 @@ export async function generateEmail(
     ],
     response_format: { type: 'json_object' },
     temperature: 0.7,
-    max_tokens: 500,
+    max_tokens: 800,
   });
 
   const content = completion.choices[0]?.message?.content;
@@ -191,14 +215,15 @@ export async function generateEmail(
 
   const result = JSON.parse(content);
 
-  // S'assurer que la signature est présente
-  const signature = `\n\nL'équipe DVS Web\n06 51 01 95 06\nhttps://dvs-web.fr`;
-  let body = result.body;
+  // S'assurer que la signature complète est présente
+  let body = result.body.trimEnd();
 
-  // Si la signature n'est pas déjà dans le body, l'ajouter
-  if (!body.includes('06 51 01 95 06') && !body.includes('dvs-web.fr')) {
-    body = body.trimEnd() + signature;
-  }
+  // Retirer "Evan" seul s'il est à la fin (sera remplacé par la signature complète)
+  body = body.replace(/\n*Evan\s*$/i, '');
+
+  // Ajouter la signature complète
+  const signature = `\n\nEvan\n06 51 01 95 06\ndvs-web.fr`;
+  body = body.trimEnd() + signature;
 
   return {
     subject: result.subject,
