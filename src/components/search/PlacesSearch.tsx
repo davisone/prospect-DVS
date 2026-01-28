@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, MapPin, Globe, Phone, Plus, Loader2 } from 'lucide-react';
+import { Search, MapPin, Globe, Phone, Plus, Loader2, Mail, MailX } from 'lucide-react';
 import type { GooglePlaceResult } from '@/types';
 
 const BUSINESS_TYPES = [
@@ -101,6 +101,7 @@ export function PlacesSearch() {
       const selectedPlaces = results.filter((r) => selected.has(r.placeId));
       const prospects = selectedPlaces.map((place) => ({
         name: place.name,
+        email: place.email,
         url: place.website,
         phone: place.phone,
         city: extractCity(place.address),
@@ -197,7 +198,7 @@ export function PlacesSearch() {
             <div>
               <CardTitle>Résultats ({results.length})</CardTitle>
               <CardDescription>
-                {selected.size} sélectionné(s)
+                {selected.size} sélectionné(s) • {results.filter(r => r.email).length} avec email
               </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -219,6 +220,7 @@ export function PlacesSearch() {
                     <TableHead>Entreprise</TableHead>
                     <TableHead>Adresse</TableHead>
                     <TableHead>Site web</TableHead>
+                    <TableHead>Email</TableHead>
                     <TableHead>Téléphone</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -260,6 +262,19 @@ export function PlacesSearch() {
                               {place.website.replace(/^https?:\/\//, '')}
                             </span>
                           </a>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {place.email ? (
+                          <div className="flex items-center gap-1 text-sm text-green-600">
+                            <Mail className="h-3 w-3" />
+                            <span className="truncate max-w-[150px]">{place.email}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 text-sm text-red-400">
+                            <MailX className="h-3 w-3" />
+                            <span>Non trouvé</span>
+                          </div>
                         )}
                       </TableCell>
                       <TableCell>

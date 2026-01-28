@@ -1,4 +1,5 @@
 import type { GooglePlaceResult } from '@/types';
+import { extractEmails } from '@/lib/analysis/checks/email';
 
 // Ille-et-Vilaine center (Rennes)
 const ILLE_ET_VILAINE_CENTER = {
@@ -176,5 +177,34 @@ export async function searchAndEnrichPlaces(
   );
 
   // Filter to only include businesses with a website
-  return enrichedPlaces.filter((place) => place.website);
+  const placesWithWebsite = enrichedPlaces.filter((place) => place.website);
+
+  // Extract emails from websites (in parallel, with limit)
+  const batchSize = 5; // Limit concurrent requests
+  const placesWithEmails: GooglePlaceResult[] = [];
+
+  for (let i = 0; i < placesWithWebsite.length; i += batchSize) {
+    const batch = placesWithWebsite.slice(i, i + batchSize);
+
+    const enrichedBatch = await Promise.all(
+      batch.map(async (place) => {
+        if (!place.website) return place;
+
+        try {
+          const emailResult = await extractEmails(place.website);
+          return {
+            ...place,
+            email: emailResult.bestEmail || undefined,
+          };
+        } catch (error) {
+          console.error(`Error extracting email for ${place.name}:`, error);
+          return place;
+        }
+      })
+    );
+
+    placesWithEmails.push(...enrichedBatch);
+  }
+
+  return placesWithEmails;
 }

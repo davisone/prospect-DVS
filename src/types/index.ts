@@ -86,6 +86,7 @@ export interface GooglePlaceResult {
   address: string;
   phone?: string;
   website?: string;
+  email?: string;
   placeId: string;
   types: string[];
 }
