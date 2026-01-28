@@ -17,14 +17,19 @@ Règles strictes :
 - Explique ce que DVS Web peut lui apporter : plus de clients, meilleure image, site qui inspire confiance
 - Sois chaleureux, humain et local (on est une agence de proximité)
 - Utilise le vouvoiement
-- Max 120 mots
+p- Max 120 mots pour le corps du message (avant la signature)
 - Termine par une question simple et ouverte
-- Signe "L'équipe DVS Web"
+
+SIGNATURE OBLIGATOIRE (à ajouter à la fin du body, exactement comme ceci) :
+
+L'équipe DVS Web
+06 51 01 95 06
+https://dvs-web.fr
 
 Tu dois répondre en JSON avec ce format exact :
 {
   "subject": "Objet du mail (court, accrocheur, PAS technique)",
-  "body": "Corps du mail"
+  "body": "Corps du mail avec la signature complète à la fin"
 }`;
 
 // Parse une valeur qui peut être un tableau, une chaîne JSON, ou une chaîne simple
@@ -42,6 +47,20 @@ function safeParseArray(value: unknown): string[] {
     }
     // Sinon c'est une chaîne simple (ex: "jQuery,WordPress")
     return value.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+// Parse une chaîne JSON ou retourne le tableau tel quel
+function safeParseDesignIssues(value: unknown): Array<{ category: string; severity: string; description: string }> {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return [];
+    }
   }
   return [];
 }
@@ -80,12 +99,44 @@ function buildUserPrompt(prospect: ProspectWithAnalysis): string {
       problems.push("Le site utilise des technologies datées - cela peut causer des problèmes d'affichage et de sécurité");
     }
 
-    // Score global
+    // Design et UX (nouveaux critères)
+    const designScore = prospect.analysis.designScore;
+    const designIssues = safeParseDesignIssues(prospect.analysis.designIssues);
+    const designSummary = prospect.analysis.designSummary;
+
+    if (designScore !== null && designScore !== undefined) {
+      // Problèmes de design visuels
+      const visualIssues = designIssues.filter(i => i.category === 'visual' && i.severity === 'high');
+      if (visualIssues.length > 0) {
+        problems.push("Le design du site fait daté - les visiteurs associent l'apparence du site à la qualité de l'entreprise");
+      }
+
+      // Problèmes d'expérience utilisateur
+      const uxIssues = designIssues.filter(i => i.category === 'ux' && (i.severity === 'high' || i.severity === 'medium'));
+      if (uxIssues.length > 0) {
+        problems.push("La navigation sur le site n'est pas intuitive - les visiteurs peinent à trouver ce qu'ils cherchent et abandonnent");
+      }
+
+      // Problèmes de structure/lisibilité
+      const structureIssues = designIssues.filter(i => i.category === 'structure' && i.severity === 'high');
+      if (structureIssues.length > 0) {
+        problems.push("La présentation des informations est confuse - les clients potentiels ne voient pas clairement vos services");
+      }
+
+      // Score design élevé = site moche
+      if (designScore >= 60) {
+        problems.push("L'aspect général du site ne met pas en valeur le professionnalisme de l'entreprise");
+      } else if (designScore >= 40 && visualIssues.length === 0) {
+        problems.push("Le site mériterait un rafraîchissement visuel pour mieux correspondre aux standards actuels");
+      } else if (designScore < 30 && designIssues.length === 0) {
+        positives.push("Le site a un design plutôt soigné");
+      }
+    }
+
+    // Score global (si très élevé et pas déjà mentionné)
     const score = prospect.analysis.score || 0;
-    if (score >= 70) {
+    if (score >= 70 && problems.length < 3) {
       problems.push("De manière générale, le site fait vraiment daté et ne reflète probablement pas la qualité de l'entreprise");
-    } else if (score >= 40) {
-      problems.push("Le site mériterait une modernisation pour mieux refléter le professionnalisme de l'entreprise");
     }
   }
 
@@ -140,8 +191,17 @@ export async function generateEmail(
 
   const result = JSON.parse(content);
 
+  // S'assurer que la signature est présente
+  const signature = `\n\nL'équipe DVS Web\n06 51 01 95 06\nhttps://dvs-web.fr`;
+  let body = result.body;
+
+  // Si la signature n'est pas déjà dans le body, l'ajouter
+  if (!body.includes('06 51 01 95 06') && !body.includes('dvs-web.fr')) {
+    body = body.trimEnd() + signature;
+  }
+
   return {
     subject: result.subject,
-    body: result.body,
+    body,
   };
 }

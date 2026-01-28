@@ -2,6 +2,7 @@ import { checkHttps } from './checks/https';
 import { checkViewport } from './checks/viewport';
 import { checkPerformance } from './checks/performance';
 import { checkStack } from './checks/stack';
+import { checkDesign, type DesignCheckResult } from './checks/design';
 import { extractEmails, type EmailExtractionResult } from './checks/email';
 import { calculateObsoleteScore } from './score';
 import type { AnalysisResult } from '@/types';
@@ -39,11 +40,12 @@ export async function analyzeWebsite(url: string, options?: { extractEmail?: boo
   // Run all checks in parallel (including email extraction if requested)
   const shouldExtractEmail = options?.extractEmail !== false; // Par défaut, on extrait les emails
 
-  const [httpsResult, viewportResult, performanceResult, stackResult, emailResult] = await Promise.all([
+  const [httpsResult, viewportResult, performanceResult, stackResult, designResult, emailResult] = await Promise.all([
     checkHttps(normalizedUrl),
     checkViewport(normalizedUrl, html),
     checkPerformance(normalizedUrl),
     checkStack(normalizedUrl, html, headers),
+    checkDesign(normalizedUrl, html),
     shouldExtractEmail ? extractEmails(normalizedUrl, html) : Promise.resolve(null),
   ]);
 
@@ -53,11 +55,16 @@ export async function analyzeWebsite(url: string, options?: { extractEmail?: boo
     ttfbMs: performanceResult.ttfbMs,
     technologies: stackResult.technologies,
     obsoleteTech: stackResult.obsoleteTech,
+    designScore: designResult.score,
+    designIssues: designResult.issues,
+    designPositives: designResult.positives,
+    designSummary: designResult.summary,
     rawData: {
       https: httpsResult,
       viewport: viewportResult,
       performance: performanceResult,
       stack: stackResult,
+      design: designResult,
       analyzedUrl: normalizedUrl,
       timestamp: Date.now(),
     },

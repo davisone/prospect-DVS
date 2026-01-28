@@ -14,6 +14,12 @@ export interface Prospect {
   createdAt: number | Date;
 }
 
+export interface DesignIssue {
+  category: 'visual' | 'ux' | 'structure' | 'accessibility';
+  severity: 'high' | 'medium' | 'low';
+  description: string;
+}
+
 export interface Analysis {
   id: string;
   prospectId: string;
@@ -22,6 +28,9 @@ export interface Analysis {
   ttfbMs: number;
   technologies: string[] | string;
   obsoleteTech: string[] | string;
+  designScore: number | null;
+  designIssues: DesignIssue[] | string | null;
+  designSummary: string | null;
   score: number;
   rawData: Record<string, unknown> | string;
   analyzedAt: number | Date;
@@ -56,6 +65,10 @@ export interface AnalysisResult {
   ttfbMs: number;
   technologies: string[];
   obsoleteTech: string[];
+  designScore: number;
+  designIssues: DesignIssue[];
+  designPositives: string[];
+  designSummary: string;
   rawData: Record<string, unknown>;
 }
 

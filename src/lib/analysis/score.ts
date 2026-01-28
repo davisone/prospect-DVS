@@ -1,42 +1,54 @@
 import type { AnalysisResult } from '@/types';
 
 // Plus le score est HAUT, plus le site est OBSOLÈTE (cible idéale)
+// Score max: 100 points répartis entre technique (50%) et design/UX (50%)
 export function calculateObsoleteScore(analysis: AnalysisResult): number {
-  let score = 0;
+  let technicalScore = 0;
+  let designScore = 0;
 
-  // HTTPS check (25 points si pas HTTPS)
+  // === SCORE TECHNIQUE (50 points max) ===
+
+  // HTTPS check (12 points si pas HTTPS)
   if (!analysis.httpsValid) {
-    score += 25;
+    technicalScore += 12;
   }
 
-  // Viewport check (25 points si pas de viewport)
+  // Viewport check (12 points si pas de viewport)
   if (!analysis.hasViewport) {
-    score += 25;
+    technicalScore += 12;
   }
 
-  // Performance check (jusqu'à 25 points)
+  // Performance check (jusqu'à 13 points)
   if (analysis.ttfbMs > 2000) {
-    score += 25;
+    technicalScore += 13;
   } else if (analysis.ttfbMs > 1000) {
-    score += 15;
+    technicalScore += 8;
   } else if (analysis.ttfbMs > 500) {
-    score += 10;
+    technicalScore += 5;
   }
 
-  // Technologies obsolètes (10 points par tech, max 25)
-  const techScore = Math.min(analysis.obsoleteTech.length * 10, 25);
-  score += techScore;
+  // Technologies obsolètes (jusqu'à 13 points)
+  const techScore = Math.min(analysis.obsoleteTech.length * 5, 13);
+  technicalScore += techScore;
 
-  // Bonus si utilise des frameworks modernes (-10 points)
+  // Bonus si utilise des frameworks modernes (-5 points)
   const modernFrameworks = ['React', 'Vue.js', 'Angular', 'Next.js', 'Nuxt.js', 'Svelte'];
   const hasModernFramework = analysis.technologies.some((tech) =>
     modernFrameworks.some((fw) => tech.includes(fw))
   );
   if (hasModernFramework) {
-    score = Math.max(0, score - 10);
+    technicalScore = Math.max(0, technicalScore - 5);
   }
 
-  return Math.min(score, 100);
+  // === SCORE DESIGN/UX (50 points max) ===
+
+  // Le designScore de l'analyse est sur 100, on le ramène à 50
+  if (analysis.designScore !== undefined && analysis.designScore !== null) {
+    designScore = Math.round(analysis.designScore / 2);
+  }
+
+  const totalScore = technicalScore + designScore;
+  return Math.min(totalScore, 100);
 }
 
 export function getScoreCategory(score: number): {
@@ -82,16 +94,16 @@ export function getScoreBreakdown(analysis: AnalysisResult): Array<{
   // HTTPS
   breakdown.push({
     criterion: 'Sécurité HTTPS',
-    points: analysis.httpsValid ? 0 : 25,
-    maxPoints: 25,
+    points: analysis.httpsValid ? 0 : 12,
+    maxPoints: 12,
     issue: analysis.httpsValid ? null : 'Site non sécurisé (HTTP)',
   });
 
   // Viewport
   breakdown.push({
     criterion: 'Responsive Design',
-    points: analysis.hasViewport ? 0 : 25,
-    maxPoints: 25,
+    points: analysis.hasViewport ? 0 : 12,
+    maxPoints: 12,
     issue: analysis.hasViewport ? null : 'Pas de viewport meta tag',
   });
 
@@ -99,29 +111,44 @@ export function getScoreBreakdown(analysis: AnalysisResult): Array<{
   let perfPoints = 0;
   let perfIssue: string | null = null;
   if (analysis.ttfbMs > 2000) {
-    perfPoints = 25;
+    perfPoints = 13;
     perfIssue = `TTFB très lent (${analysis.ttfbMs}ms)`;
   } else if (analysis.ttfbMs > 1000) {
-    perfPoints = 15;
+    perfPoints = 8;
     perfIssue = `TTFB lent (${analysis.ttfbMs}ms)`;
   } else if (analysis.ttfbMs > 500) {
-    perfPoints = 10;
+    perfPoints = 5;
     perfIssue = `TTFB acceptable (${analysis.ttfbMs}ms)`;
   }
   breakdown.push({
     criterion: 'Performance',
     points: perfPoints,
-    maxPoints: 25,
+    maxPoints: 13,
     issue: perfIssue,
   });
 
   // Technologies obsolètes
-  const techPoints = Math.min(analysis.obsoleteTech.length * 10, 25);
+  const techPoints = Math.min(analysis.obsoleteTech.length * 5, 13);
   breakdown.push({
     criterion: 'Technologies',
     points: techPoints,
-    maxPoints: 25,
+    maxPoints: 13,
     issue: analysis.obsoleteTech.length > 0 ? analysis.obsoleteTech.join(', ') : null,
+  });
+
+  // Design/UX
+  const designPoints = analysis.designScore !== undefined && analysis.designScore !== null
+    ? Math.round(analysis.designScore / 2)
+    : 0;
+  const designIssues = analysis.designIssues || [];
+  const highSeverityIssues = designIssues.filter(i => i.severity === 'high');
+  breakdown.push({
+    criterion: 'Design & UX',
+    points: designPoints,
+    maxPoints: 50,
+    issue: analysis.designSummary || (highSeverityIssues.length > 0
+      ? highSeverityIssues.map(i => i.description).join(', ')
+      : null),
   });
 
   return breakdown;

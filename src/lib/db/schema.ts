@@ -20,6 +20,9 @@ export const analyses = sqliteTable('analyses', {
   ttfbMs: integer('ttfb_ms').notNull(),
   technologies: text('technologies').notNull(), // JSON array
   obsoleteTech: text('obsolete_tech').notNull(), // JSON array
+  designScore: integer('design_score'), // Score design/UX (0-100)
+  designIssues: text('design_issues'), // JSON array of design issues
+  designSummary: text('design_summary'), // Résumé de l'analyse design
   score: integer('score').notNull(),
   rawData: text('raw_data').notNull(), // JSON object
   analyzedAt: integer('analyzed_at', { mode: 'timestamp' }).notNull(),
