@@ -2,10 +2,15 @@ import { checkHttps } from './checks/https';
 import { checkViewport } from './checks/viewport';
 import { checkPerformance } from './checks/performance';
 import { checkStack } from './checks/stack';
+import { extractEmails, type EmailExtractionResult } from './checks/email';
 import { calculateObsoleteScore } from './score';
 import type { AnalysisResult } from '@/types';
 
-export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
+export interface AnalysisResultWithEmail extends AnalysisResult {
+  emailExtraction?: EmailExtractionResult;
+}
+
+export async function analyzeWebsite(url: string, options?: { extractEmail?: boolean }): Promise<AnalysisResultWithEmail> {
   // Normalize URL
   let normalizedUrl = url.trim();
   if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
@@ -31,15 +36,18 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
     // Continue with individual checks
   }
 
-  // Run all checks in parallel
-  const [httpsResult, viewportResult, performanceResult, stackResult] = await Promise.all([
+  // Run all checks in parallel (including email extraction if requested)
+  const shouldExtractEmail = options?.extractEmail !== false; // Par défaut, on extrait les emails
+
+  const [httpsResult, viewportResult, performanceResult, stackResult, emailResult] = await Promise.all([
     checkHttps(normalizedUrl),
     checkViewport(normalizedUrl, html),
     checkPerformance(normalizedUrl),
     checkStack(normalizedUrl, html, headers),
+    shouldExtractEmail ? extractEmails(normalizedUrl, html) : Promise.resolve(null),
   ]);
 
-  const result: AnalysisResult = {
+  const result: AnalysisResultWithEmail = {
     httpsValid: httpsResult.valid,
     hasViewport: viewportResult.hasViewport,
     ttfbMs: performanceResult.ttfbMs,
@@ -54,6 +62,11 @@ export async function analyzeWebsite(url: string): Promise<AnalysisResult> {
       timestamp: Date.now(),
     },
   };
+
+  // Ajouter les résultats d'extraction d'email si disponibles
+  if (emailResult) {
+    result.emailExtraction = emailResult;
+  }
 
   return result;
 }

@@ -160,7 +160,7 @@ export function ProspectsTable({ prospects, onRefresh }: ProspectsTableProps) {
                       {prospect.email ? (
                         <Mail className="h-4 w-4 text-green-600 flex-shrink-0" />
                       ) : (
-                        <MailX className="h-4 w-4 text-red-500 flex-shrink-0" title="Pas d'email" />
+                        <MailX className="h-4 w-4 text-red-500 flex-shrink-0" />
                       )}
                       <div>
                         {prospect.name}

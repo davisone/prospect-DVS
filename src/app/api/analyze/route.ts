@@ -38,9 +38,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Run analysis
-    const result = await analyzeWebsite(prospect[0].url);
+    // Run analysis (with email extraction)
+    const result = await analyzeWebsite(prospect[0].url, { extractEmail: true });
     const score = calculateObsoleteScore(result);
+
+    // Si le prospect n'a pas d'email et qu'on en a trouvé un, le mettre à jour
+    if (!prospect[0].email && result.emailExtraction?.bestEmail) {
+      await db
+        .update(prospects)
+        .set({ email: result.emailExtraction.bestEmail })
+        .where(eq(prospects.id, prospectId));
+    }
 
     // Check if analysis already exists
     const existingAnalysis = await db
@@ -92,6 +100,9 @@ export async function POST(request: NextRequest) {
         ...result,
         score,
       },
+      emailExtracted: result.emailExtraction?.bestEmail || null,
+      emailSource: result.emailExtraction?.source || null,
+      allEmailsFound: result.emailExtraction?.emails || [],
     });
   } catch (error) {
     console.error('Error analyzing prospect:', error);
