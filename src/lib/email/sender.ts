@@ -20,10 +20,15 @@ export async function sendEmail(params: SendEmailParams): Promise<{ success: boo
   try {
     const { data, error } = await resend.emails.send({
       from: `${senderName} <${senderEmail}>`,
+      replyTo: senderEmail,
       to: params.to,
       subject: params.subject,
-      html: formatEmailHtml(params.body),
-      text: params.body,
+      html: formatEmailHtml(params.body, senderEmail),
+      text: formatEmailText(params.body, senderEmail),
+      headers: {
+        'List-Unsubscribe': `<mailto:${senderEmail}?subject=Désinscription>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
     });
 
     if (error) {
@@ -39,8 +44,11 @@ export async function sendEmail(params: SendEmailParams): Promise<{ success: boo
   }
 }
 
-function formatEmailHtml(body: string): string {
-  // Convert line breaks to HTML and wrap in basic styling
+function formatEmailText(body: string, senderEmail: string): string {
+  return `${body}\n\n---\nSi vous ne souhaitez plus recevoir nos emails, répondez à cet email avec le mot "Désinscription" ou écrivez à ${senderEmail}`;
+}
+
+function formatEmailHtml(body: string, senderEmail: string): string {
   const htmlBody = body
     .split('\n')
     .map((line) => (line.trim() === '' ? '<br>' : `<p style="margin: 0 0 10px 0;">${line}</p>`))
@@ -48,13 +56,21 @@ function formatEmailHtml(body: string): string {
 
   return `
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>${''}</title>
 </head>
-<body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  ${htmlBody}
+<body style="font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff;">
+  <div style="max-width: 580px; margin: 0 auto;">
+    ${htmlBody}
+  </div>
+  <div style="margin-top: 30px; padding-top: 15px; border-top: 1px solid #eeeeee; font-size: 11px; color: #999999; text-align: center;">
+    <p style="margin: 0;">Si vous ne souhaitez plus recevoir nos emails, <a href="mailto:${senderEmail}?subject=D%C3%A9sinscription" style="color: #999999; text-decoration: underline;">cliquez ici pour vous désinscrire</a>.</p>
+  </div>
 </body>
 </html>
   `.trim();

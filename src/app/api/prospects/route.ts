@@ -26,13 +26,15 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .offset(offset);
 
-    // Par défaut, exclure les prospects "not_prospectable" sauf si demandé
+    // Par défaut, exclure les prospects "not_prospectable" et "sent" sauf si demandé
     if (!includeExcluded) {
       query = query.where(
-        or(
-          eq(prospects.followUpStatus, 'none'),
-          ne(prospects.followUpStatus, 'not_prospectable'),
-          // null est aussi OK (pas encore de statut)
+        and(
+          ne(prospects.status, 'sent'),
+          or(
+            eq(prospects.followUpStatus, 'none'),
+            ne(prospects.followUpStatus, 'not_prospectable'),
+          )
         )
       ) as typeof query;
     }
