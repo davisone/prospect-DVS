@@ -181,16 +181,16 @@ SENDER_NAME=DVS Web`}
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="p-4 border rounded-lg">
-              <p className="font-medium">Centre de recherche</p>
-              <p className="text-lg">Rennes (48.1173, -1.6778)</p>
+              <p className="font-medium">Zone de recherche</p>
+              <p className="text-lg">France entière (101 départements)</p>
             </div>
             <div className="p-4 border rounded-lg">
-              <p className="font-medium">Rayon de recherche</p>
-              <p className="text-lg">50 km</p>
+              <p className="font-medium">Rayon par département</p>
+              <p className="text-lg">50 km autour de la préfecture</p>
             </div>
           </div>
           <p className="text-sm text-muted-foreground mt-4">
-            La recherche couvre tout le département de l'Ille-et-Vilaine.
+            La recherche couvre les 101 départements français × 16 types de métiers.
             Les chaînes nationales sont automatiquement exclues des résultats.
           </p>
         </CardContent>

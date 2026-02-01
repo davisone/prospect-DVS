@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -12,129 +11,124 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Search, MapPin, Globe, Phone, Plus, Loader2, Mail, MailX } from 'lucide-react';
-import type { GooglePlaceResult } from '@/types';
+import { Search, Square } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { DEPARTMENTS } from '@/lib/departments';
+import { BUSINESS_TYPES } from '@/lib/google-places';
 
-const BUSINESS_TYPES = [
-  { value: 'restaurant', label: 'Restaurant' },
-  { value: 'bakery', label: 'Boulangerie' },
-  { value: 'hair_care', label: 'Coiffeur' },
-  { value: 'beauty_salon', label: 'Salon de beauté' },
-  { value: 'car_repair', label: 'Garage auto' },
-  { value: 'dentist', label: 'Dentiste' },
-  { value: 'doctor', label: 'Médecin' },
-  { value: 'veterinary_care', label: 'Vétérinaire' },
-  { value: 'real_estate_agency', label: 'Agence immobilière' },
-  { value: 'lawyer', label: 'Avocat' },
-  { value: 'accounting', label: 'Comptable' },
-  { value: 'plumber', label: 'Plombier' },
-  { value: 'electrician', label: 'Électricien' },
-  { value: 'florist', label: 'Fleuriste' },
-  { value: 'gym', label: 'Salle de sport' },
-  { value: 'spa', label: 'Spa' },
-];
+interface ProgressEvent {
+  type: 'progress' | 'complete' | 'error' | 'fatal_error';
+  department?: string;
+  departmentCode?: string;
+  businessType?: string;
+  found?: number;
+  total?: number;
+  current?: number;
+  totalImported?: number;
+  message?: string;
+}
 
 export function PlacesSearch() {
-  const [query, setQuery] = useState('');
-  const [type, setType] = useState<string>('all');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [searching, setSearching] = useState(false);
-  const [results, setResults] = useState<GooglePlaceResult[]>([]);
-  const [excludedCount, setExcludedCount] = useState(0);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  // useRef pour garder la dernière valeur de totalImported accessible dans le catch
+  const lastTotalImportedRef = useRef(0);
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
+  const handleSearch = useCallback(async () => {
+    if (!selectedDepartment) return;
 
     setSearching(true);
     setMessage(null);
+    setProgress(null);
+    lastTotalImportedRef.current = 0;
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     try {
-      const params = new URLSearchParams({ query });
-      if (type && type !== 'all') params.append('type', type);
-
-      const response = await fetch(`/api/search-places?${params}`);
-      const data = await response.json();
-
-      if (response.ok) {
-        setResults(data.places || []);
-        setExcludedCount(data.excludedCount || 0);
-        if (data.places?.length === 0 && data.excludedCount > 0) {
-          setMessage({ type: 'info', text: `${data.excludedCount} résultat(s) trouvé(s) mais déjà dans votre base` });
-        } else if (data.places?.length === 0) {
-          setMessage({ type: 'error', text: 'Aucun résultat avec site web trouvé' });
-        } else if (data.excludedCount > 0) {
-          setMessage({ type: 'info', text: `${data.excludedCount} résultat(s) masqué(s) car déjà dans votre base` });
-        }
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Erreur de recherche' });
-      }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Erreur de connexion' });
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const toggleSelect = (placeId: string) => {
-    const newSelected = new Set(selected);
-    if (newSelected.has(placeId)) {
-      newSelected.delete(placeId);
-    } else {
-      newSelected.add(placeId);
-    }
-    setSelected(newSelected);
-  };
-
-  const selectAll = () => {
-    if (selected.size === results.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(results.map((r) => r.placeId)));
-    }
-  };
-
-  const handleImport = async () => {
-    if (selected.size === 0) return;
-
-    setImporting(true);
-    setMessage(null);
-
-    try {
-      const selectedPlaces = results.filter((r) => selected.has(r.placeId));
-      const prospects = selectedPlaces.map((place) => ({
-        name: place.name,
-        email: place.email,
-        url: place.website,
-        phone: place.phone,
-        city: extractCity(place.address),
-      }));
-
-      const response = await fetch('/api/prospects', {
+      const response = await fetch('/api/search-places/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prospects, source: 'google_places' }),
+        body: JSON.stringify({ departmentCode: selectedDepartment }),
+        signal: abortController.signal,
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error('Erreur lors du lancement de la recherche');
+      }
 
-      if (response.ok) {
-        setMessage({ type: 'success', text: `${data.inserted} prospects importés` });
-        setSelected(new Set());
-        // Remove imported from results
-        setResults(results.filter((r) => !selected.has(r.placeId)));
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Erreur d\'import' });
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Pas de stream disponible');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const dataLine = line.trim();
+          if (!dataLine.startsWith('data: ')) continue;
+
+          try {
+            const event: ProgressEvent = JSON.parse(dataLine.slice(6));
+            setProgress(event);
+            lastTotalImportedRef.current = event.totalImported || 0;
+
+            if (event.type === 'complete') {
+              setMessage({
+                type: 'success',
+                text: `Recherche terminée ! ${event.totalImported} prospects importés au total.`,
+              });
+              setSearching(false);
+            } else if (event.type === 'fatal_error') {
+              setMessage({
+                type: 'error',
+                text: `Erreur fatale : ${event.message}. ${event.totalImported} prospects importés avant l'erreur.`,
+              });
+              setSearching(false);
+            }
+          } catch {
+            // Ignorer les lignes mal formées
+          }
+        }
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Erreur de connexion' });
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        const imported = lastTotalImportedRef.current;
+        setMessage({
+          type: 'info',
+          text: `Recherche arrêtée. ${imported} prospect(s) déjà importé(s) et conservé(s) en base.`,
+        });
+      } else {
+        setMessage({
+          type: 'error',
+          text: error instanceof Error ? error.message : 'Erreur de connexion',
+        });
+      }
     } finally {
-      setImporting(false);
+      setSearching(false);
+      abortControllerRef.current = null;
     }
-  };
+  }, [selectedDepartment]);
+
+  const handleStop = useCallback(() => {
+    abortControllerRef.current?.abort();
+  }, []);
+
+  const progressPercent = progress?.total && progress?.current
+    ? Math.round((progress.current / progress.total) * 100)
+    : 0;
+
+  const selectedDeptName = DEPARTMENTS.find((d) => d.code === selectedDepartment)?.name;
 
   return (
     <div className="space-y-6">
@@ -142,47 +136,66 @@ export function PlacesSearch() {
         <CardHeader>
           <CardTitle>Recherche Google Places</CardTitle>
           <CardDescription>
-            Recherchez des entreprises en Ille-et-Vilaine. Seules les entreprises avec un site web sont affichées.
+            Sélectionnez un département puis lancez la recherche sur les {BUSINESS_TYPES.length} types de métiers.
+            Les prospects avec site web sont importés automatiquement en base.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3 items-end">
             <div className="md:col-span-2">
-              <Label htmlFor="query">Recherche</Label>
-              <Input
-                id="query"
-                placeholder="Ex: boulangerie Rennes, coiffeur Saint-Malo..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              />
-            </div>
-            <div>
-              <Label htmlFor="type">Type d'activité</Label>
-              <Select value={type} onValueChange={setType}>
+              <Label htmlFor="department">Département</Label>
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment} disabled={searching}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Tous types" />
+                  <SelectValue placeholder="Choisir un département..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tous types</SelectItem>
-                  {BUSINESS_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.label}
+                  {DEPARTMENTS.map((dept) => (
+                    <SelectItem key={dept.code} value={dept.code}>
+                      {dept.code} — {dept.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              {!searching ? (
+                <Button onClick={handleSearch} disabled={!selectedDepartment} className="w-full">
+                  <Search className="h-4 w-4 mr-2" />
+                  Lancer la recherche
+                </Button>
+              ) : (
+                <Button onClick={handleStop} variant="destructive" className="w-full">
+                  <Square className="h-4 w-4 mr-2" />
+                  Arrêter
+                </Button>
+              )}
+            </div>
           </div>
 
-          <Button onClick={handleSearch} disabled={searching || !query.trim()}>
-            {searching ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Search className="h-4 w-4 mr-2" />
-            )}
-            Rechercher
-          </Button>
+          {(searching || progress) && progress && (
+            <div className="space-y-3">
+              <Progress value={progress.type === 'complete' ? 100 : progressPercent} className="h-3" />
+              <div className="grid gap-2 md:grid-cols-3 text-sm">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-muted-foreground">Progression</p>
+                  <p className="font-bold text-lg">{progress.current}/{progress.total}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-muted-foreground">Métier en cours</p>
+                  <p className="font-bold text-lg truncate">{progress.businessType || '—'}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-muted-foreground">Prospects importés</p>
+                  <p className="font-bold text-lg text-green-600">{progress.totalImported}</p>
+                </div>
+              </div>
+              {searching && (
+                <p className="text-xs text-muted-foreground">
+                  {progressPercent}% — Dernière recherche : {progress.found} nouveau(x) prospect(s) trouvé(s)
+                </p>
+              )}
+            </div>
+          )}
 
           {message && (
             <div
@@ -199,120 +212,6 @@ export function PlacesSearch() {
           )}
         </CardContent>
       </Card>
-
-      {results.length > 0 && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Résultats ({results.length})</CardTitle>
-              <CardDescription>
-                {selected.size} sélectionné(s) • {results.filter(r => r.email).length} avec email
-              </CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={selectAll}>
-                {selected.size === results.length ? 'Désélectionner tout' : 'Tout sélectionner'}
-              </Button>
-              <Button onClick={handleImport} disabled={importing || selected.size === 0}>
-                <Plus className="h-4 w-4 mr-2" />
-                {importing ? 'Import...' : 'Importer la sélection'}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-md border max-h-[500px] overflow-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12"></TableHead>
-                    <TableHead>Entreprise</TableHead>
-                    <TableHead>Adresse</TableHead>
-                    <TableHead>Site web</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Téléphone</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {results.map((place) => (
-                    <TableRow
-                      key={place.placeId}
-                      className={`cursor-pointer ${
-                        selected.has(place.placeId) ? 'bg-primary/5' : ''
-                      }`}
-                      onClick={() => toggleSelect(place.placeId)}
-                    >
-                      <TableCell>
-                        <input
-                          type="checkbox"
-                          checked={selected.has(place.placeId)}
-                          onChange={() => toggleSelect(place.placeId)}
-                          className="h-4 w-4"
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">{place.name}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <MapPin className="h-3 w-3" />
-                          <span className="truncate max-w-[200px]">{place.address}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {place.website && (
-                          <a
-                            href={place.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-blue-600 hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Globe className="h-3 w-3" />
-                            <span className="truncate max-w-[150px]">
-                              {place.website.replace(/^https?:\/\//, '')}
-                            </span>
-                          </a>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {place.email ? (
-                          <div className="flex items-center gap-1 text-sm text-green-600">
-                            <Mail className="h-3 w-3" />
-                            <span className="truncate max-w-[150px]">{place.email}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 text-sm text-red-400">
-                            <MailX className="h-3 w-3" />
-                            <span>Non trouvé</span>
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {place.phone && (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Phone className="h-3 w-3" />
-                            {place.phone}
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
-}
-
-function extractCity(address: string): string {
-  // Try to extract city from French address format
-  const parts = address.split(',');
-  if (parts.length >= 2) {
-    // Usually "Street, PostalCode City, Country"
-    const cityPart = parts[parts.length - 2]?.trim() || '';
-    // Remove postal code
-    return cityPart.replace(/^\d{5}\s*/, '').trim();
-  }
-  return '';
 }

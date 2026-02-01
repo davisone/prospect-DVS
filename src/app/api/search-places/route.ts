@@ -14,6 +14,9 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('query');
     const type = searchParams.get('type');
+    const lat = searchParams.get('lat');
+    const lng = searchParams.get('lng');
+    const department = searchParams.get('department');
 
     if (!query) {
       return NextResponse.json(
@@ -22,7 +25,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const places = await searchAndEnrichPlaces(query, type || undefined);
+    const options = lat && lng ? {
+      lat: parseFloat(lat),
+      lng: parseFloat(lng),
+      departmentName: department || undefined,
+    } : undefined;
+
+    const places = await searchAndEnrichPlaces(query, type || undefined, options);
 
     // Récupérer tous les prospects existants pour filtrer les doublons
     const existingProspects = await db.select().from(prospects);

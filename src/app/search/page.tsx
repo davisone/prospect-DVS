@@ -6,7 +6,7 @@ export default function SearchPage() {
       <div>
         <h1 className="text-3xl font-bold">Recherche Google Places</h1>
         <p className="text-muted-foreground">
-          Recherchez des entreprises en Ille-et-Vilaine via Google Places
+          Recherchez des entreprises sur toute la France via Google Places
         </p>
       </div>
 

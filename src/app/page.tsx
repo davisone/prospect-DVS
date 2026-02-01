@@ -23,7 +23,7 @@ export default function DashboardPage() {
 
   const fetchProspects = useCallback(async () => {
     try {
-      const response = await fetch('/api/prospects');
+      const response = await fetch('/api/prospects?limit=10000');
       const data = await response.json();
 
       if (data.prospects) {

@@ -1,31 +1,27 @@
 import type { GooglePlaceResult } from '@/types';
 import { extractEmails } from '@/lib/analysis/checks/email';
-
-// Ille-et-Vilaine center (Rennes)
-const ILLE_ET_VILAINE_CENTER = {
-  lat: 48.1173,
-  lng: -1.6778,
-};
-
-const SEARCH_RADIUS = 50000; // 50km
+import { DEPARTMENT_SEARCH_RADIUS } from '@/lib/departments';
 
 export const BUSINESS_TYPES = [
-  { value: 'restaurant', label: 'Restaurant' },
-  { value: 'bakery', label: 'Boulangerie' },
-  { value: 'hair_care', label: 'Coiffeur' },
-  { value: 'beauty_salon', label: 'Salon de beauté' },
-  { value: 'car_repair', label: 'Garage auto' },
-  { value: 'dentist', label: 'Dentiste' },
-  { value: 'doctor', label: 'Médecin' },
-  { value: 'veterinary_care', label: 'Vétérinaire' },
-  { value: 'real_estate_agency', label: 'Agence immobilière' },
-  { value: 'lawyer', label: 'Avocat' },
-  { value: 'accounting', label: 'Comptable' },
+  // Artisans du bâtiment
   { value: 'plumber', label: 'Plombier' },
   { value: 'electrician', label: 'Électricien' },
+  { value: 'roofing_contractor', label: 'Couvreur' },
+  { value: 'general_contractor', label: 'Maçon' },
+  { value: 'painter', label: 'Peintre en bâtiment' },
+  { value: 'carpenter', label: 'Menuisier' },
+  { value: 'carpenter', label: 'Charpentier' },
+  { value: 'locksmith', label: 'Serrurier' },
+  { value: 'general_contractor', label: 'Carreleur' },
+  { value: 'general_contractor', label: 'Terrassier' },
+  { value: 'general_contractor', label: 'Plaquiste' },
+  { value: 'general_contractor', label: 'Chauffagiste' },
+  // Commerces de proximité / TPE
+  { value: 'bakery', label: 'Boulangerie' },
+  { value: 'hair_care', label: 'Coiffeur' },
   { value: 'florist', label: 'Fleuriste' },
-  { value: 'gym', label: 'Salle de sport' },
-  { value: 'spa', label: 'Spa' },
+  { value: 'restaurant', label: 'Restaurant' },
+  { value: 'car_repair', label: 'Garage auto' },
 ] as const;
 
 // National chains to exclude
@@ -75,7 +71,8 @@ function isNationalChain(name: string): boolean {
 
 export async function searchPlaces(
   query: string,
-  type?: string
+  type?: string,
+  options?: { lat: number; lng: number; radius?: number; departmentName?: string }
 ): Promise<GooglePlaceResult[]> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
 
@@ -83,11 +80,16 @@ export async function searchPlaces(
     throw new Error('Google Places API key not configured');
   }
 
+  const lat = options?.lat ?? 48.1173;
+  const lng = options?.lng ?? -1.6778;
+  const radius = options?.radius ?? DEPARTMENT_SEARCH_RADIUS;
+  const departmentName = options?.departmentName ?? 'Ille-et-Vilaine';
+
   // Use Text Search API (New)
   const url = new URL('https://maps.googleapis.com/maps/api/place/textsearch/json');
-  url.searchParams.set('query', `${query} Ille-et-Vilaine`);
-  url.searchParams.set('location', `${ILLE_ET_VILAINE_CENTER.lat},${ILLE_ET_VILAINE_CENTER.lng}`);
-  url.searchParams.set('radius', SEARCH_RADIUS.toString());
+  url.searchParams.set('query', `${query} ${departmentName}`);
+  url.searchParams.set('location', `${lat},${lng}`);
+  url.searchParams.set('radius', radius.toString());
   url.searchParams.set('key', apiKey);
   url.searchParams.set('language', 'fr');
 
@@ -156,9 +158,10 @@ export async function getPlaceDetails(placeId: string): Promise<{
 
 export async function searchAndEnrichPlaces(
   query: string,
-  type?: string
+  type?: string,
+  options?: { lat: number; lng: number; radius?: number; departmentName?: string }
 ): Promise<GooglePlaceResult[]> {
-  const places = await searchPlaces(query, type);
+  const places = await searchPlaces(query, type, options);
 
   // Enrich with details (phone, website)
   const enrichedPlaces = await Promise.all(
