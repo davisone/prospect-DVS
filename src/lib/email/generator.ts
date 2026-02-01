@@ -5,14 +5,16 @@ import { getScoreBreakdown } from '../analysis/score';
 const SYSTEM_PROMPT = `Tu écris des emails de prospection pour Evan, développeur web indépendant.
 
 TON :
-Direct, humain et professionnel. Poli mais sans formules commerciales.
-Tu parles comme quelqu’un de normal, pas comme un consultant ni comme un commercial.
+Curieux, bienveillant et professionnel. Tu t'intéresses sincèrement à l'activité du prospect.
+Tu parles comme quelqu'un de normal, pas comme un consultant ni comme un commercial.
 
 RÈGLES STRICTES (OBLIGATOIRES) :
+- INTERDIT de critiquer le site actuel du prospect, même subtilement
+- INTERDIT de mentionner des problèmes, défauts ou points faibles du site
 - PAS de jargon technique (interdit : technologies, sécurité, audit, analyse, performance, SEO, UX)
-- PAS de phrases de rapport ou d’expert
+- PAS de phrases de rapport ou d'expert
 - PAS de justification abstraite ("ce qui peut", "afin de", "cela permet")
-- PAS de flatterie
+- PAS de flatterie exagérée
 - PAS de phrases bateau
 - PAS de ton vendeur
 - Vouvoiement obligatoire
@@ -28,32 +30,29 @@ POLITESSE (INTRODUCTION) :
 
 STRUCTURE OBLIGATOIRE (6–8 phrases max) :
 
-1. INTRO POLIE ET SIMPLE (1–2 phrases)
+1. INTRO CHALEUREUSE (1–2 phrases)
    - Salutation
-   - Dire simplement que tu es tombé sur leur site en cherchant des [leur métier] dans leur ville
-   - Ton humain, normal
+   - Dire simplement que tu es tombé sur leur activité en cherchant des [leur métier] dans leur ville
+   - Montrer un intérêt sincère pour ce qu'ils font
 
-2. CONSTAT CONCRET (2–3 phrases)
-   - Décrire uniquement des problèmes visibles pour un humain
-   - Parler comme quelqu’un qui a juste navigué sur le site
-   - Exemples autorisés :
-     "le site commence à dater"
-     "sur téléphone, ce n’est pas très agréable"
-     "on a du mal à trouver les infos importantes"
-   - Expliquer brièvement que ça fait partir des visiteurs
-   - Jamais de termes techniques
-
-3. PROPOSITION SIMPLE (2–3 phrases)
-   - Dire que tu refais des sites pour des entreprises locales
-   - Mentionner naturellement que tu t’es lancé récemment en freelance avec DVS Web
+2. VALEUR ET CONTEXTE (2–3 phrases)
+   - Dire que tu accompagnes des entreprises locales pour les aider à gagner en visibilité et attirer plus de clients grâce à leur site web
+   - Mentionner naturellement que tu t'es lancé récemment en freelance avec DVS Web
    - Ne JAMAIS utiliser les mots "junior", "débutant" ou équivalent
+   - Rester centré sur la valeur que tu apportes (plus de clients, meilleure visibilité), pas sur les défauts du prospect
+
+3. QUESTION OUVERTE (1–2 phrases)
+   - Demander s'ils ont des projets ou des envies côté site web en ce moment
    - Proposer un échange court, sans pression
-   - Terminer par une question simple.general
+   - Exemples autorisés :
+     "Est-ce que vous avez des projets côté site web en ce moment ?"
+     "Est-ce que c'est un sujet qui vous intéresse ?"
+     "Est-ce que vous avez déjà réfléchi à faire évoluer votre site ?"
 
 SIGNATURE :
 - Le message doit se terminer UNIQUEMENT par :
 "Evan"
-- N’ajoute aucun titre, aucune coordonnée, aucun texte après
+- N'ajoute aucun titre, aucune coordonnée, aucun texte après
 - AUCUNE exception
 
 FORMAT DE SORTIE OBLIGATOIRE (json) :
@@ -65,7 +64,8 @@ Tu dois répondre UNIQUEMENT en json valide, sans aucun texte avant ou après.
 }
 
 RAPPEL :
-Si une phrase sonne comme un audit, un rapport ou un discours de consultant, elle est interdite et doit être réécrite.`;
+Ne JAMAIS critiquer le site du prospect. L'email doit donner envie de répondre, pas mettre sur la défensive.
+Si une phrase ressemble à un audit, un reproche ou un constat négatif, elle est interdite et doit être réécrite.`;
 
 // Parse une valeur qui peut être un tableau, une chaîne JSON, ou une chaîne simple
 function safeParseArray(value: unknown): string[] {
@@ -101,88 +101,11 @@ function safeParseDesignIssues(value: unknown): Array<{ category: string; severi
 }
 
 function buildUserPrompt(prospect: ProspectWithAnalysis): string {
-  const problems: string[] = [];
-  const positives: string[] = [];
-
-  if (prospect.analysis) {
-    // Sécurité (HTTPS)
-    if (!prospect.analysis.httpsValid) {
-      problems.push("Le site n'est pas sécurisé - les visiteurs voient un avertissement 'Non sécurisé' dans leur navigateur, ce qui fait fuir les clients");
-    } else {
-      positives.push("Le site est sécurisé (cadenas vert)");
-    }
-
-    // Mobile (viewport)
-    if (!prospect.analysis.hasViewport) {
-      problems.push("Le site ne s'affiche pas correctement sur téléphone - or 60% des gens naviguent sur mobile");
-    } else {
-      positives.push("Le site s'adapte aux téléphones");
-    }
-
-    // Performance (TTFB)
-    if (prospect.analysis.ttfbMs > 2000) {
-      problems.push("Le site est très lent à charger - les visiteurs partent avant même de voir le contenu");
-    } else if (prospect.analysis.ttfbMs > 1000) {
-      problems.push("Le site met du temps à charger - chaque seconde d'attente fait perdre des clients potentiels");
-    } else {
-      positives.push("Le site se charge rapidement");
-    }
-
-    // Technologies obsolètes
-    const obsoleteTech = safeParseArray(prospect.analysis.obsoleteTech);
-    if (obsoleteTech.length > 0) {
-      problems.push("Le site utilise des technologies datées - cela peut causer des problèmes d'affichage et de sécurité");
-    }
-
-    // Design et UX (nouveaux critères)
-    const designScore = prospect.analysis.designScore;
-    const designIssues = safeParseDesignIssues(prospect.analysis.designIssues);
-    const designSummary = prospect.analysis.designSummary;
-
-    if (designScore !== null && designScore !== undefined) {
-      // Problèmes de design visuels
-      const visualIssues = designIssues.filter(i => i.category === 'visual' && i.severity === 'high');
-      if (visualIssues.length > 0) {
-        problems.push("Le design du site fait daté - les visiteurs associent l'apparence du site à la qualité de l'entreprise");
-      }
-
-      // Problèmes d'expérience utilisateur
-      const uxIssues = designIssues.filter(i => i.category === 'ux' && (i.severity === 'high' || i.severity === 'medium'));
-      if (uxIssues.length > 0) {
-        problems.push("La navigation sur le site n'est pas intuitive - les visiteurs peinent à trouver ce qu'ils cherchent et abandonnent");
-      }
-
-      // Problèmes de structure/lisibilité
-      const structureIssues = designIssues.filter(i => i.category === 'structure' && i.severity === 'high');
-      if (structureIssues.length > 0) {
-        problems.push("La présentation des informations est confuse - les clients potentiels ne voient pas clairement vos services");
-      }
-
-      // Score design élevé = site moche
-      if (designScore >= 60) {
-        problems.push("L'aspect général du site ne met pas en valeur le professionnalisme de l'entreprise");
-      } else if (designScore >= 40 && visualIssues.length === 0) {
-        problems.push("Le site mériterait un rafraîchissement visuel pour mieux correspondre aux standards actuels");
-      } else if (designScore < 30 && designIssues.length === 0) {
-        positives.push("Le site a un design plutôt soigné");
-      }
-    }
-
-    // Score global (si très élevé et pas déjà mentionné)
-    const score = prospect.analysis.score || 0;
-    if (score >= 70 && problems.length < 3) {
-      problems.push("De manière générale, le site fait vraiment daté et ne reflète probablement pas la qualité de l'entreprise");
-    }
-  }
-
   return `Entreprise : ${prospect.name}
 Ville : ${prospect.city || 'inconnue'}
 Site : ${prospect.url || 'pas de site'}
 
-Ce qui cloche sur leur site :
-${problems.length > 0 ? problems.slice(0, 2).map(p => `- ${p}`).join('\n') : '- Site vieillot qui mériterait un coup de neuf'}
-
-Écris un email direct et franc. Pas de blabla, pas de flatterie. Tu constates un problème, tu proposes d'en parler.`;
+Écris un email court et humain. Tu t'intéresses à leur activité, tu te présentes, et tu demandes s'ils ont des projets côté site web. Ne critique JAMAIS leur site actuel.`;
 }
 
 export async function generateEmail(
