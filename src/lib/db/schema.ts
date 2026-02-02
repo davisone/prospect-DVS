@@ -7,6 +7,7 @@ export const prospects = sqliteTable('prospects', {
   url: text('url'),
   city: text('city'),
   phone: text('phone'),
+  departmentCode: text('department_code'),
   source: text('source', { enum: ['csv', 'google_places'] }).notNull(),
   status: text('status', { enum: ['pending', 'analyzed', 'draft_ready', 'queued', 'sent'] }).notNull().default('pending'),
   followUpStatus: text('follow_up_status', { enum: ['none', 'waiting', 'accepted', 'refused', 'no_response', 'not_prospectable'] }).default('none'),

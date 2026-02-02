@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,8 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw, ExternalLink, Clock, CheckCircle, XCircle, AlertCircle, Ban } from 'lucide-react';
+import { RefreshCw, ExternalLink, Clock, CheckCircle, XCircle, AlertCircle, Ban, MapPin } from 'lucide-react';
 import type { Prospect, FollowUpStatus } from '@/types';
+import { DEPARTMENTS } from '@/lib/departments';
 
 const FOLLOW_UP_LABELS: Record<FollowUpStatus, { label: string; color: string; icon: React.ReactNode }> = {
   none: { label: 'Aucun', color: 'secondary', icon: null },
@@ -36,6 +37,7 @@ export default function SuiviPage() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
 
   const fetchProspects = useCallback(async () => {
     setLoading(true);
@@ -80,8 +82,21 @@ export default function SuiviPage() {
     }
   };
 
+  // Départements présents dans les prospects
+  const availableDepartments = useMemo(() => {
+    const codes = new Set(prospects.map((p) => p.departmentCode).filter(Boolean));
+    return DEPARTMENTS
+      .filter((d) => codes.has(d.code))
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [prospects]);
+
+  // Prospects filtrés par département
+  const filteredProspects = selectedDepartment === 'all'
+    ? prospects
+    : prospects.filter((p) => p.departmentCode === selectedDepartment);
+
   const getProspectsByStatus = (status: FollowUpStatus) =>
-    prospects.filter((p) => p.followUpStatus === status);
+    filteredProspects.filter((p) => p.followUpStatus === status);
 
   const stats = {
     waiting: getProspectsByStatus('waiting').length,
@@ -145,10 +160,30 @@ export default function SuiviPage() {
             Gérez les réponses et le statut de vos prospects démarchés
           </p>
         </div>
-        <Button variant="outline" onClick={fetchProspects} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Actualiser
-        </Button>
+        <div className="flex items-center gap-3">
+          {availableDepartments.length > 0 && (
+            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+              <SelectTrigger className="w-[260px]">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  <SelectValue placeholder="Tous les départements" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les départements</SelectItem>
+                {availableDepartments.map((dept) => (
+                  <SelectItem key={dept.code} value={dept.code}>
+                    {dept.code} — {dept.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button variant="outline" onClick={fetchProspects} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Actualiser
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}

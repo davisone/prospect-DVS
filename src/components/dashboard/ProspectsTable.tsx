@@ -275,7 +275,7 @@ export function ProspectsTable({ prospects, onRefresh }: ProspectsTableProps) {
 
       {/* Barre d'actions de sélection */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg sticky top-0 z-10">
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-blue-800">
               {selectedIds.size} prospect(s) sélectionné(s)

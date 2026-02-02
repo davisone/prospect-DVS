@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
                   url: place.website || null,
                   city: extractCity(place.address),
                   phone: place.phone || null,
+                  departmentCode: department.code,
                   source: 'google_places',
                   status: 'pending',
                   followUpStatus: 'none',

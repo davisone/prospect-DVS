@@ -10,6 +10,7 @@ export interface Prospect {
   url: string | null;
   city: string | null;
   phone: string | null;
+  departmentCode: string | null;
   source: ProspectSource;
   status: ProspectStatus;
   followUpStatus: FollowUpStatus | null;

@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { prospects, emailDrafts } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { sendEmail } from '@/lib/email/sender';
+import { incrementDailyCount } from '@/lib/email/queue';
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,6 +60,10 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Increment daily email counter
+    const today = new Date().toISOString().split('T')[0];
+    await incrementDailyCount(today);
 
     // Update prospect status and set follow-up to "waiting"
     await db

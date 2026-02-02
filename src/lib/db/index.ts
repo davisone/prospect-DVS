@@ -64,4 +64,11 @@ sqlite.exec(`
   );
 `);
 
+// Add department_code column if it doesn't exist
+try {
+  sqlite.exec(`ALTER TABLE prospects ADD COLUMN department_code TEXT;`);
+} catch {
+  // Column already exists
+}
+
 export { schema };
