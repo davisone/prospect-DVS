@@ -4,6 +4,7 @@ import { prospects, analyses, emailDrafts } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { generateEmail } from '@/lib/email/generator';
 import { v4 as uuid } from 'uuid';
+import type { Analysis } from '@/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,12 +39,7 @@ export async function POST(request: NextRequest) {
     const analysis = result[0].analysis;
     const prospectWithAnalysis = {
       ...result[0].prospect,
-      analysis: analysis ? {
-        ...analysis,
-        technologies: JSON.parse(analysis.technologies as string || '[]'),
-        obsoleteTech: JSON.parse(analysis.obsoleteTech as string || '[]'),
-        rawData: JSON.parse(analysis.rawData as string || '{}'),
-      } : null,
+      analysis: analysis ? (analysis as unknown as Analysis) : null,
     };
 
     // Generate email with OpenAI

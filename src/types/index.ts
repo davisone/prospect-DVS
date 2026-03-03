@@ -15,8 +15,8 @@ export interface Prospect {
   status: ProspectStatus;
   followUpStatus: FollowUpStatus | null;
   followUpNote: string | null;
-  followUpAt: number | Date | null;
-  createdAt: number | Date;
+  followUpAt: Date | null;
+  createdAt: Date;
 }
 
 export interface DesignIssue {
@@ -31,14 +31,14 @@ export interface Analysis {
   httpsValid: boolean;
   hasViewport: boolean;
   ttfbMs: number;
-  technologies: string[] | string;
-  obsoleteTech: string[] | string;
+  technologies: string[];
+  obsoleteTech: string[];
   designScore: number | null;
-  designIssues: DesignIssue[] | string | null;
+  designIssues: DesignIssue[] | null;
   designSummary: string | null;
   score: number;
-  rawData: Record<string, unknown> | string;
-  analyzedAt: number | Date;
+  rawData: Record<string, unknown>;
+  analyzedAt: Date;
 }
 
 export interface EmailDraft {
@@ -46,16 +46,16 @@ export interface EmailDraft {
   prospectId: string;
   subject: string;
   body: string;
-  generatedAt: number;
+  generatedAt: Date;
 }
 
 export interface EmailQueueItem {
   id: string;
   prospectId: string;
   draftId: string;
-  scheduledAt: number;
+  scheduledAt: Date;
   status: QueueStatus;
-  sentAt: number | null;
+  sentAt: Date | null;
   error: string | null;
 }
 

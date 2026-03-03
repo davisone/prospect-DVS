@@ -11,12 +11,8 @@ interface AnalysisCardProps {
 }
 
 export function AnalysisCard({ analysis }: AnalysisCardProps) {
-  const technologies = typeof analysis.technologies === 'string'
-    ? JSON.parse(analysis.technologies)
-    : analysis.technologies;
-  const obsoleteTech = typeof analysis.obsoleteTech === 'string'
-    ? JSON.parse(analysis.obsoleteTech)
-    : analysis.obsoleteTech;
+  const technologies = (analysis.technologies ?? []) as string[];
+  const obsoleteTech = (analysis.obsoleteTech ?? []) as string[];
 
   const getScoreColor = (score: number) => {
     if (score >= 70) return 'text-green-600';

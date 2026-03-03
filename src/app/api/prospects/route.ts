@@ -47,14 +47,7 @@ export async function GET(request: NextRequest) {
 
     const prospectsWithData = results.map((row) => ({
       ...row.prospect,
-      analysis: row.analysis
-        ? {
-            ...row.analysis,
-            technologies: JSON.parse(row.analysis.technologies as string),
-            obsoleteTech: JSON.parse(row.analysis.obsoleteTech as string),
-            rawData: JSON.parse(row.analysis.rawData as string),
-          }
-        : null,
+      analysis: row.analysis ?? null,
       draft: row.draft,
     }));
 
