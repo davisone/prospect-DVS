@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw, ExternalLink, Clock, CheckCircle, XCircle, AlertCircle, Ban, MapPin } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { RefreshCw, ExternalLink, Clock, CheckCircle, XCircle, AlertCircle, Ban, MapPin, Search } from 'lucide-react';
 import type { Prospect, FollowUpStatus } from '@/types';
 import { DEPARTMENTS } from '@/lib/departments';
 
@@ -38,6 +39,7 @@ export default function SuiviPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchProspects = useCallback(async () => {
     setLoading(true);
@@ -90,10 +92,24 @@ export default function SuiviPage() {
       .sort((a, b) => a.code.localeCompare(b.code));
   }, [prospects]);
 
-  // Prospects filtrés par département
-  const filteredProspects = selectedDepartment === 'all'
-    ? prospects
-    : prospects.filter((p) => p.departmentCode === selectedDepartment);
+  // Prospects filtrés par département et recherche
+  const filteredProspects = useMemo(() => {
+    let filtered = selectedDepartment === 'all'
+      ? prospects
+      : prospects.filter((p) => p.departmentCode === selectedDepartment);
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((p) =>
+        p.name?.toLowerCase().includes(query) ||
+        p.city?.toLowerCase().includes(query) ||
+        p.email?.toLowerCase().includes(query) ||
+        p.url?.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [prospects, selectedDepartment, searchQuery]);
 
   const getProspectsByStatus = (status: FollowUpStatus) =>
     filteredProspects.filter((p) => p.followUpStatus === status);
@@ -184,6 +200,17 @@ export default function SuiviPage() {
             Actualiser
           </Button>
         </div>
+      </div>
+
+      {/* Barre de recherche */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Rechercher par nom, ville, email ou site..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
       </div>
 
       {/* Stats */}
